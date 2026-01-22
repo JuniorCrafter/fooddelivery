@@ -35,3 +35,19 @@ curl-health:
 
 test:
 	go test ./...
+
+COMPOSE = docker compose -f deploy/docker-compose.yml
+
+.PHONY: up down logs ps
+up:
+	$(COMPOSE) up -d --build
+
+down:
+	$(COMPOSE) down -v
+
+logs:
+	$(COMPOSE) logs -f --tail=200
+
+ps:
+	$(COMPOSE) ps
+
