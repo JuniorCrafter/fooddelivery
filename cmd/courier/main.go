@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"food-delivery/internal/platform"
+	"github.com/JuniorCrafter/fooddelivery/internal/platform"
 )
 
 func main() {

@@ -2,7 +2,7 @@ package handler
 
 import (
 	"encoding/json"
-	jwtutil "food-delivery/internal/platform/jwt"
+	jwtutil "github.com/JuniorCrafter/fooddelivery/internal/platform/jwt"
 	"net/http"
 	"strings"
 

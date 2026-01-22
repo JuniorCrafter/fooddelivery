@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	jwtutil "food-delivery/internal/platform/jwt"
+	jwtutil "github.com/JuniorCrafter/fooddelivery/internal/platform/jwt"
 	"strings"
 	"time"
 
@@ -92,7 +92,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (newAccess, 
 	}
 	// Роль нужна для access token → вытаскиваем email/role проще отдельным запросом по uid на следующем шаге.
 	// Для этапа 1 добавим маленький запрос:
-	u, err := s.repoGetUserByID(ctx, uid)
+	u, err := s.repo.GetUserByID(ctx, uid)
 	if err != nil {
 		return "", "", err
 	}
