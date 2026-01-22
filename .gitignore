@@ -1,0 +1,17 @@
+# Binaries
+/bin/
+*.exe
+*.out
+
+# Build artifacts
+/dist/
+
+# Local env
+.env
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
