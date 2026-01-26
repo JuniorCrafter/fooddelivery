@@ -7,6 +7,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -24,13 +26,24 @@ type User struct {
 	Role         string
 }
 
+var ErrEmailTaken = errors.New("email already taken")
+
 func (r *Repo) CreateUser(ctx context.Context, email, passHash, role string) (int64, error) {
 	var id int64
 	err := r.pool.QueryRow(ctx,
 		`INSERT INTO users(email, password_hash, role) VALUES ($1,$2,$3) RETURNING id`,
 		email, passHash, role,
 	).Scan(&id)
-	return id, err
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return 0, ErrEmailTaken
+		}
+		return 0, err
+	}
+
+	return id, nil
 }
 
 func (r *Repo) GetUserByEmail(ctx context.Context, email string) (User, error) {

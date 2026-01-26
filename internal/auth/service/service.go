@@ -5,24 +5,35 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	jwtutil "github.com/JuniorCrafter/fooddelivery/internal/platform/jwt"
 	"strings"
 	"time"
+
+	jwtutil "github.com/JuniorCrafter/fooddelivery/internal/platform/jwt"
 
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/JuniorCrafter/fooddelivery/internal/auth/repo"
 )
 
+type Repo interface {
+	CreateUser(ctx context.Context, email, passHash, role string) (int64, error)
+	GetUserByEmail(ctx context.Context, email string) (repo.User, error)
+	GetUserByID(ctx context.Context, id int64) (repo.User, error)
+
+	SaveRefreshToken(ctx context.Context, userID int64, rawToken string, expiresAt time.Time) error
+	UseRefreshToken(ctx context.Context, rawToken string) (int64, error)
+	RevokeAllRefreshTokens(ctx context.Context, userID int64) error
+}
+
 type Service struct {
-	repo       *repo.Repo
+	repo       Repo
 	jwtSecret  []byte
 	accessTTL  time.Duration
 	refreshTTL time.Duration
 	bcryptCost int
 }
 
-func New(r *repo.Repo, jwtSecret []byte, accessTTL, refreshTTL time.Duration, bcryptCost int) *Service {
+func New(r Repo, jwtSecret []byte, accessTTL, refreshTTL time.Duration, bcryptCost int) *Service {
 	return &Service{
 		repo: r, jwtSecret: jwtSecret,
 		accessTTL: accessTTL, refreshTTL: refreshTTL,

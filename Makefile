@@ -51,3 +51,16 @@ logs:
 ps:
 	$(COMPOSE) ps
 
+COMPOSE = docker compose -f deploy/docker-compose.yml
+
+.PHONY: up down logs ps migrate-up migrate-down migrate-version
+
+migrate-up:
+	$(COMPOSE) run --rm migrate -path=/migrations -database "$$DATABASE_URL" up
+
+migrate-down:
+	$(COMPOSE) run --rm migrate -path=/migrations -database "$$DATABASE_URL" down 1
+
+migrate-version:
+	$(COMPOSE) run --rm migrate -path=/migrations -database "$$DATABASE_URL" version
+

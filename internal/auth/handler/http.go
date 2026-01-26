@@ -2,13 +2,14 @@ package handler
 
 import (
 	"encoding/json"
-	jwtutil "github.com/JuniorCrafter/fooddelivery/internal/platform/jwt"
+	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/JuniorCrafter/fooddelivery/internal/auth/repo"
 	"github.com/JuniorCrafter/fooddelivery/internal/auth/service"
+	"github.com/JuniorCrafter/fooddelivery/internal/platform/httpmw"
 )
 
 type Handler struct {
@@ -28,9 +29,13 @@ func (h *Handler) Routes() chi.Router {
 	r.Post("/v1/auth/refresh", h.refresh)
 
 	r.Group(func(pr chi.Router) {
-		pr.Use(h.authMiddleware)
+		pr.Use(httpmw.Auth(h.jwtSecret))
+
 		pr.Get("/v1/auth/me", h.me)
 		pr.Post("/v1/auth/logout", h.logout)
+
+		// Пример RBAC-эндпоинта (только admin)
+		pr.With(httpmw.RequireRole("admin")).Get("/v1/auth/admin/ping", h.adminPing)
 	})
 
 	return r
@@ -55,6 +60,10 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	}
 	access, refresh, err := h.svc.Register(r.Context(), req.Email, req.Password, req.Role)
 	if err != nil {
+		if errors.Is(err, repo.ErrEmailTaken) {
+			http.Error(w, "email already registered", http.StatusConflict)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -103,36 +112,21 @@ type meResp struct {
 	Role   string `json:"role"`
 }
 
-type ctxKey string
-
-const ctxClaimsKey ctxKey = "claims"
-
-func (h *Handler) authMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hdr := r.Header.Get("Authorization")
-		if hdr == "" || !strings.HasPrefix(hdr, "Bearer ") {
-			http.Error(w, "missing token", http.StatusUnauthorized)
-			return
-		}
-		tok := strings.TrimPrefix(hdr, "Bearer ")
-		claims, err := jwtutil.ParseHS256(h.jwtSecret, tok)
-		if err != nil {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
-			return
-		}
-		ctx := r.Context()
-		ctx = contextWithClaims(ctx, claims)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
-	claims := claimsFromContext(r.Context())
+	claims, ok := httpmw.Claims(r.Context())
+	if !ok {
+		http.Error(w, "missing claims", http.StatusUnauthorized)
+		return
+	}
 	writeJSON(w, http.StatusOK, meResp{UserID: claims.UserID, Role: claims.Role})
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
-	claims := claimsFromContext(r.Context())
+	claims, ok := httpmw.Claims(r.Context())
+	if !ok {
+		http.Error(w, "missing claims", http.StatusUnauthorized)
+		return
+	}
 	if err := h.svc.Logout(r.Context(), claims.UserID); err != nil {
 		http.Error(w, "logout failed", http.StatusInternalServerError)
 		return
@@ -144,4 +138,10 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func (h *Handler) adminPing(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"ok":true}`))
 }
