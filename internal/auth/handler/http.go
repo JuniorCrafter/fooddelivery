@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -112,10 +113,6 @@ type meResp struct {
 	Role   string `json:"role"`
 }
 
-type ctxKey string
-
-const ctxClaimsKey ctxKey = "claims"
-
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	claims, ok := httpmw.Claims(r.Context())
 	if !ok {
@@ -139,13 +136,20 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		http.Error(w, "failed to encode json", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
+
+	if _, err := w.Write(append(data, '\n')); err != nil {
+		log.Printf("write response: %v", err)
+	}
 }
 
 func (h *Handler) adminPing(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`{"ok":true}`))
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
