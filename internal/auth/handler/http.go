@@ -112,10 +112,6 @@ type meResp struct {
 	Role   string `json:"role"`
 }
 
-type ctxKey string
-
-const ctxClaimsKey ctxKey = "claims"
-
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	claims, ok := httpmw.Claims(r.Context())
 	if !ok {
