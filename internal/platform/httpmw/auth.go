@@ -1,68 +1,45 @@
 package httpmw
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
-	jwtutil "github.com/JuniorCrafter/fooddelivery/internal/platform/jwt"
+	"github.com/golang-jwt/jwt/v5"
 )
 
-type claimsKey struct{}
+// Секретный ключ должен быть таким же, как в сервисе Auth!
+var secretKey = []byte("my_super_secret_key_123")
 
-// Auth проверяет Bearer JWT, парсит и кладёт Claims в context.
-// Возвращает 401, если токена нет/он невалидный.
-func Auth(secret []byte) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			hdr := r.Header.Get("Authorization")
-			if hdr == "" || !strings.HasPrefix(hdr, "Bearer ") {
-				http.Error(w, "missing token", http.StatusUnauthorized)
-				return
-			}
+// AuthMiddleware — это и есть наш охранник
+func AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 1. Берем заголовок Authorization (там лежит наш "браслет")
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Требуется авторизация", http.StatusUnauthorized)
+			return
+		}
 
-			tok := strings.TrimPrefix(hdr, "Bearer ")
-			claims, err := jwtutil.ParseHS256(secret, tok)
-			if err != nil {
-				http.Error(w, "invalid token", http.StatusUnauthorized)
-				return
-			}
+		// 2. Обычно заголовок выглядит так: "Bearer <токен>"
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			http.Error(w, "Неверный формат заголовка", http.StatusUnauthorized)
+			return
+		}
 
-			ctx := context.WithValue(r.Context(), claimsKey{}, claims)
-			next.ServeHTTP(w, r.WithContext(ctx))
+		tokenString := parts[1]
+
+		// 3. Проверяем, настоящий ли токен
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			return secretKey, nil
 		})
-	}
-}
 
-// Claims возвращает Claims из контекста (если Auth уже отработал).
-func Claims(ctx context.Context) (*jwtutil.Claims, bool) {
-	v := ctx.Value(claimsKey{})
-	if v == nil {
-		return nil, false
-	}
-	c, ok := v.(*jwtutil.Claims)
-	return c, ok
-}
+		if err != nil || !token.Valid {
+			http.Error(w, "Неверный или просроченный токен", http.StatusUnauthorized)
+			return
+		}
 
-// RequireRole требует одну из ролей. Если роль не подходит — 403.
-func RequireRole(roles ...string) func(http.Handler) http.Handler {
-	allowed := make(map[string]struct{}, len(roles))
-	for _, r := range roles {
-		allowed[r] = struct{}{}
-	}
-
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			claims, ok := Claims(r.Context())
-			if !ok {
-				http.Error(w, "missing claims", http.StatusUnauthorized)
-				return
-			}
-			if _, ok := allowed[claims.Role]; !ok {
-				http.Error(w, "forbidden", http.StatusForbidden)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
+		// Если всё ок — пропускаем запрос дальше к "официанту"
+		next.ServeHTTP(w, r)
+	})
 }

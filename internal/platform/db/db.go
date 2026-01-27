@@ -2,19 +2,23 @@ package db
 
 import (
 	"context"
-	"time"
+	"fmt"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool" // Библиотека для управления пулом соединений
 )
 
-func NewPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
-	cfg, err := pgxpool.ParseConfig(databaseURL)
+// NewPool создает "бассейн" соединений с базой.
+// Это эффективнее, чем открывать новое соединение на каждый чих.
+func NewPool(ctx context.Context, connString string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(ctx, connString)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("не удалось создать пул: %w", err)
 	}
-	cfg.MaxConns = 10
-	cfg.MinConns = 2
-	cfg.MaxConnIdleTime = 5 * time.Minute
 
-	return pgxpool.NewWithConfig(ctx, cfg)
+	// Проверяем, что база реально отвечает
+	if err := pool.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("база недоступна: %w", err)
+	}
+
+	return pool, nil
 }

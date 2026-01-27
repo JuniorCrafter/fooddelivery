@@ -1,17 +1,21 @@
 services:
   postgres:
     image: postgres:16
+    env_file:
+      - ../.env
     environment:
-      POSTGRES_DB: food
-      POSTGRES_USER: food
-      POSTGRES_PASSWORD: food
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
     ports:
-      - "5433:5432"   # или уберите ports вовсе, если не нужен доступ с хоста
+      - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U food -d food"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
-      retries: 20
+      retries: 10
+
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -33,16 +37,43 @@ services:
       postgres:
         condition: service_healthy
 
+
   migrate:
-    profiles: ["tools"]
-    image: migrate/migrate:4
-    volumes:
-      - ../migrations:/migrations:ro
-    entrypoint: ["migrate"]
+    image: migrate/migrate:v4.17.1
+    env_file:
+      - ../.env
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ../migrations:/migrations:ro
+    command: ["-path","/migrations","-database","${DATABASE_URL}","up"]
+    restart: "no"
 
+
+
+  catalog-api:
+    build:
+      context: ..
+      dockerfile: deploy/catalog/Dockerfile
+    env_file:
+      - ../.env
+    depends_on:
+      - postgres
+    ports:
+      - "8081:8080"
+
+  catalog-migrate:
+    image: migrate/migrate:v4.17.1
+    env_file:
+      - ../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../migrations:/migrations:ro
+    command: ["-path","/migrations/catalog","-database","${CATALOG_DB_URL}","up"]
+    restart: "no"
 
 volumes:
   pgdata:

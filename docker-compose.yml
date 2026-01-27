@@ -1,88 +1,11 @@
-name: food-delivery
+name: fooddelivery
 
 services:
   postgres:
     image: postgres:16-alpine
-    env_file:
-      - .env
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-
-  api:
-    build:
-      context: .
-      args:
-        SERVICE: api
-    env_file:
-      - .env
     environment:
-      SERVICE_NAME: api
-      HTTP_PORT: "8080"
-      POSTGRES_ADDR: "postgres:5432"
-      CHECK_POSTGRES: "true"
-      LOG_LEVEL: "INFO"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "18080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  courier:
-    build:
-      context: .
-      args:
-        SERVICE: courier
-    env_file:
-      - .env
-    environment:
-      SERVICE_NAME: courier
-      HTTP_PORT: "8081"
-      POSTGRES_ADDR: "postgres:5432"
-      CHECK_POSTGRES: "true"
-      LOG_LEVEL: "INFO"
-    ports:
-      - "18081:8081"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  notifications:
-    build:
-      context: .
-      args:
-        SERVICE: notifications
-    env_file:
-      - .env
-    environment:
-      SERVICE_NAME: notifications
-      HTTP_PORT: "18082"
-      POSTGRES_ADDR: "postgres:5432"
-      CHECK_POSTGRES: "true"
-      LOG_LEVEL: "INFO"
-    ports:
-      - "8082:8082"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-volumes:
-  pgdata:
+      - "5432:5432"

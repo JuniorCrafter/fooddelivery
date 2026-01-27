@@ -1,4 +1,4 @@
-package jwtutil
+package jwt
 
 import (
 	"time"
@@ -6,37 +6,18 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type Claims struct {
-	UserID int64  `json:"uid"`
-	Role   string `json:"role"`
-	jwt.RegisteredClaims
-}
+// Наш секретный ключ (в реальном проекте он должен быть в.env)
+var secretKey = []byte("my_super_secret_key_123")
 
-func MintHS256(secret []byte, userID int64, role string, ttl time.Duration) (string, error) {
-	now := time.Now()
-	claims := Claims{
-		UserID: userID,
-		Role:   role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   "auth",
-			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
-		},
-	}
-	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString(secret)
-}
-
-func ParseHS256(secret []byte, token string) (*Claims, error) {
-	parsed, err := jwt.ParseWithClaims(token, &Claims{}, func(t *jwt.Token) (any, error) {
-		return secret, nil
+// GenerateToken создает зашифрованную строку с ID пользователя
+func GenerateToken(userID int64, role string) (string, error) {
+	// Создаем "полезную нагрузку" (claims)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": userID,
+		"role":    role,                                  // Роль: client, courier или admin
+		"exp":     time.Now().Add(time.Hour * 24).Unix(), // Токен живет 24 часа
 	})
-	if err != nil {
-		return nil, err
-	}
-	claims, ok := parsed.Claims.(*Claims)
-	if !ok || !parsed.Valid {
-		return nil, jwt.ErrTokenInvalidClaims
-	}
-	return claims, nil
+
+	// Подписываем токен нашим ключом
+	return token.SignedString(secretKey)
 }
