@@ -12,8 +12,8 @@ import (
 
 // Service описывает, что наш сервис умеет делать
 type Service interface {
-	Register(ctx context.Context, email, password string) (int64, error)
-	Login(ctx context.Context, email, password string) (string, error) // Новое!
+	Register(ctx context.Context, email, password, role string) (int64, error)
+	Login(ctx context.Context, email, password string) (string, error)
 }
 
 type authService struct {
@@ -25,7 +25,7 @@ func New(r repo.Repository) Service {
 	return &authService{repo: r}
 }
 
-func (s *authService) Register(ctx context.Context, email, password string) (int64, error) {
+func (s *authService) Register(ctx context.Context, email, password, role string) (int64, error) {
 	// 1. Шифруем пароль. Cost 10 — это оптимальная сложность шифрования
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 10)
 	if err != nil {
@@ -36,6 +36,7 @@ func (s *authService) Register(ctx context.Context, email, password string) (int
 	u := repo.User{
 		Email:    email,
 		Password: string(hashedPassword),
+		Role:     role,
 	}
 
 	// 3. Просим репозиторий сохранить его в базу

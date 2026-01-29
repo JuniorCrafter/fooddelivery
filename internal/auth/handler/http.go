@@ -26,6 +26,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 type registerRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	Role     string `json:"role"`
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +39,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Вызываем наш сервис
-	id, err := h.authService.Register(r.Context(), req.Email, req.Password)
+	id, err := h.authService.Register(r.Context(), req.Email, req.Password, req.Role)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
