@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
@@ -12,26 +13,22 @@ type Config struct {
 	DatabaseURL string `env:"DATABASE_URL"`
 	LocalDBURL  string `env:"LOCAL_DATABASE_URL"`
 	AuthPort    string `env:"AUTH_PORT" envDefault:":8081"`
+	RabbitMQURL string `env:"RABBITMQ_URL" envDefault:"amqp://guest:guest@localhost:5672/"`
 }
 
 func Load() *Config {
-	// 1. Загружаем файл.env
-	if err := godotenv.Load(); err != nil {
-		log.Println("Файл.env не найден, используем переменные окружения")
-	}
+	_ = godotenv.Load()
 
 	cfg := Config{}
-	// 2. Парсим переменные в структуру
 	if err := env.Parse(&cfg); err != nil {
 		log.Fatalf("Ошибка парсинга конфига: %v", err)
 	}
 
-	// 3. Проверка: если мы запущены НЕ в Docker, используем LOCAL_DATABASE_URL
-	// Простой способ проверить Docker — наличие файла /.dockerenv
+	// Умная замена хостов для локального запуска
 	if _, err := os.Stat("/.dockerenv"); err != nil {
-		if cfg.LocalDBURL != "" {
-			cfg.DatabaseURL = cfg.LocalDBURL
-		}
+		// Если мы не в докере, меняем имена контейнеров на localhost
+		cfg.DatabaseURL = strings.Replace(cfg.DatabaseURL, "@postgres:", "@localhost:", 1)
+		cfg.RabbitMQURL = strings.Replace(cfg.RabbitMQURL, "@rabbitmq:", "@localhost:", 1)
 	}
 
 	return &cfg

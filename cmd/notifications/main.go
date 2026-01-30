@@ -1,20 +1,25 @@
 package main
 
 import (
-	"net/http"
+	"log"
 
-	"github.com/JuniorCrafter/fooddelivery/internal/platform"
+	"github.com/JuniorCrafter/fooddelivery/internal/notifications/service"
+	"github.com/JuniorCrafter/fooddelivery/internal/platform/config"
 )
 
 func main() {
-	cfg := platform.LoadConfig("notifications")
-	ready := platform.PostgresTCPReadyCheck(cfg)
+	// 1. Загружаем конфиг
+	cfg := config.Load()
 
-	_ = platform.RunHTTP(cfg, func(mux *http.ServeMux) {
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("Notifications service is running\n"))
-		})
-	}, ready)
+	// 2. Инициализируем потребителя (Consumer), используя данные из cfg
+	// Теперь мы РЕАЛЬНО используем переменную cfg, и Go доволен
+	consumer, err := service.NewConsumer(cfg.RabbitMQURL)
+	if err != nil {
+		log.Fatalf("Не удалось подключиться к RabbitMQ по адресу %s: %v", cfg.RabbitMQURL, err)
+	}
+
+	log.Println("Notification Service успешно запущен...")
+
+	// 3. Начинаем слушать очередь
+	consumer.Listen()
 }
