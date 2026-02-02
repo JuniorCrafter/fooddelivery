@@ -70,6 +70,22 @@ func main() {
 				"message": "Статус заказа #" + strconv.FormatInt(input.OrderID, 10) + " изменен на " + input.Status,
 			})
 		})
+		// Внутри r.Group(func(r chi.Router) {... })
+		r.Get("/courier/dashboard/{id}", func(w http.ResponseWriter, r *http.Request) {
+			idStr := chi.URLParam(r, "id")
+			courierID, _ := strconv.ParseInt(idStr, 10, 64)
+
+			summary, history, err := courierServ.GetDashboard(r.Context(), courierID)
+			if err != nil {
+				http.Error(w, "Ошибка получения данных", 500)
+				return
+			}
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"summary": summary,
+				"history": history,
+			})
+		})
 	})
 
 	// Запускаем сервис на порту 8083 (или берем из конфига)

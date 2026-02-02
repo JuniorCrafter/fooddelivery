@@ -12,11 +12,18 @@ type OrderInfo struct {
 	TotalPrice float64 `json:"total_price"`
 }
 
+type Summary struct {
+	TotalOrders   int     `json:"total_orders"`
+	TotalEarnings float64 `json:"total_earnings"`
+}
+
 type Repository interface {
 	GetNewOrders(ctx context.Context) ([]OrderInfo, error)
 	// Важно: здесь (string, error)
 	AcceptOrder(ctx context.Context, courierID, orderID int64) (string, error)
 	UpdateStatus(ctx context.Context, orderID int64, status string) error
+	GetCourierHistory(ctx context.Context, courierID int64) ([]OrderInfo, error)
+	GetCourierSummary(ctx context.Context, courierID int64) (Summary, error)
 }
 
 type pgRepo struct {
@@ -75,4 +82,35 @@ func (r *pgRepo) UpdateStatus(ctx context.Context, orderID int64, status string)
 	query := "UPDATE orders SET status = $1 WHERE id = $2"
 	_, err := r.db.Exec(ctx, query, status, orderID)
 	return err
+}
+
+func (r *pgRepo) GetCourierHistory(ctx context.Context, courierID int64) ([]OrderInfo, error) {
+	query := "SELECT id, total_price FROM orders WHERE courier_id = $1 AND status = 'completed' ORDER BY created_at DESC"
+	rows, err := r.db.Query(ctx, query, courierID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []OrderInfo
+	for rows.Next() {
+		var o OrderInfo
+		rows.Scan(&o.ID, &o.TotalPrice)
+		history = append(history, o)
+	}
+	return history, nil
+}
+
+func (r *pgRepo) GetCourierSummary(ctx context.Context, courierID int64) (Summary, error) {
+	var s Summary
+	// Считаем: (количество заказов * 100р) + (10% от суммы всех заказов)
+	query := `
+		SELECT
+			COUNT(id),
+			COALESCE(SUM(total_price * 0.1 + 100), 0)
+		FROM orders
+		WHERE courier_id = $1 AND status = 'completed'`
+
+	err := r.db.QueryRow(ctx, query, courierID).Scan(&s.TotalOrders, &s.TotalEarnings)
+	return s, err
 }
