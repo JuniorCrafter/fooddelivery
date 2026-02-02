@@ -13,6 +13,7 @@ type Service interface {
 	TakeOrder(ctx context.Context, courierID, orderID int64) (string, error)
 	ChangeStatus(ctx context.Context, orderID int64, status string) error // Новое!
 	GetDashboard(ctx context.Context, courierID int64) (repo.Summary, []repo.OrderInfo, error)
+	ListFreeCouriers(ctx context.Context) ([]repo.CourierInfo, error)
 }
 
 type courierService struct {
@@ -53,4 +54,8 @@ func (s *courierService) GetDashboard(ctx context.Context, courierID int64) (rep
 
 	history, err := s.repo.GetCourierHistory(ctx, courierID)
 	return summary, history, err
+}
+
+func (s *courierService) ListFreeCouriers(ctx context.Context) ([]repo.CourierInfo, error) {
+	return s.repo.GetAvailableCouriers(ctx)
 }

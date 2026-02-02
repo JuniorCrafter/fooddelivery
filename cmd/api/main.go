@@ -1,20 +1,44 @@
 package main
 
 import (
+	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 
-	"github.com/JuniorCrafter/fooddelivery/internal/platform"
+	"github.com/go-chi/chi/v5"
 )
 
-func main() {
-	cfg := platform.LoadConfig("api")
-	ready := platform.PostgresTCPReadyCheck(cfg)
+// proxyHandler — это функция, которая перенаправляет запрос на другой адрес
+func proxyHandler(targetAddr string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		target, _ := url.Parse(targetAddr)
+		proxy := httputil.NewSingleHostReverseProxy(target)
 
-	_ = platform.RunHTTP(cfg, func(mux *http.ServeMux) {
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("Food Delivery API service is running\n"))
-		})
-	}, ready)
+		// Обновляем заголовки, чтобы микросервис понимал, откуда пришел запрос
+		r.URL.Host = target.Host
+		r.URL.Scheme = target.Scheme
+		r.Header.Set("X-Forwarded-Host", r.Header.Get("Host"))
+		r.Host = target.Host
+
+		proxy.ServeHTTP(w, r)
+	}
+}
+
+func main() {
+	r := chi.NewRouter()
+
+	// Настраиваем маршруты: "путь" -> "адрес сервиса"
+	// Мы используем http.StripPrefix, чтобы убрать "/auth" из пути перед отправкой
+	// Пример: зашли на :8000/auth/login -> отправили на :8081/login
+	r.Mount("/auth", http.StripPrefix("/auth", proxyHandler("http://localhost:8081")))
+	r.Mount("/catalog", http.StripPrefix("/catalog", proxyHandler("http://localhost:8080")))
+	r.Mount("/orders", http.StripPrefix("/orders", proxyHandler("http://localhost:8082")))
+	r.Mount("/courier", http.StripPrefix("/courier", proxyHandler("http://localhost:8083")))
+	r.Mount("/geo", http.StripPrefix("/geo", proxyHandler("http://localhost:8084")))
+
+	log.Println("API Gateway запущен на порту :8000")
+	if err := http.ListenAndServe(":8000", r); err != nil {
+		log.Fatal(err)
+	}
 }

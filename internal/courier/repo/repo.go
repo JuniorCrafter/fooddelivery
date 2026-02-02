@@ -17,6 +17,11 @@ type Summary struct {
 	TotalEarnings float64 `json:"total_earnings"`
 }
 
+type CourierInfo struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
 type Repository interface {
 	GetNewOrders(ctx context.Context) ([]OrderInfo, error)
 	// Важно: здесь (string, error)
@@ -24,6 +29,7 @@ type Repository interface {
 	UpdateStatus(ctx context.Context, orderID int64, status string) error
 	GetCourierHistory(ctx context.Context, courierID int64) ([]OrderInfo, error)
 	GetCourierSummary(ctx context.Context, courierID int64) (Summary, error)
+	GetAvailableCouriers(ctx context.Context) ([]CourierInfo, error)
 }
 
 type pgRepo struct {
@@ -113,4 +119,21 @@ func (r *pgRepo) GetCourierSummary(ctx context.Context, courierID int64) (Summar
 
 	err := r.db.QueryRow(ctx, query, courierID).Scan(&s.TotalOrders, &s.TotalEarnings)
 	return s, err
+}
+
+func (r *pgRepo) GetAvailableCouriers(ctx context.Context) ([]CourierInfo, error) {
+	query := "SELECT id, name FROM couriers WHERE is_available = TRUE"
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []CourierInfo
+	for rows.Next() {
+		var c CourierInfo
+		rows.Scan(&c.ID, &c.Name)
+		list = append(list, c)
+	}
+	return list, nil
 }
