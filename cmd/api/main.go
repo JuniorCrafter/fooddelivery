@@ -28,16 +28,15 @@ func proxyHandler(targetAddr string) http.HandlerFunc {
 func main() {
 	r := chi.NewRouter()
 
-	// Настраиваем маршруты: "путь" -> "адрес сервиса"
-	// Мы используем http.StripPrefix, чтобы убрать "/auth" из пути перед отправкой
-	// Пример: зашли на :8000/auth/login -> отправили на :8081/login
-	r.Mount("/auth", http.StripPrefix("/auth", proxyHandler("http://localhost:8081")))
-	r.Mount("/catalog", http.StripPrefix("/catalog", proxyHandler("http://localhost:8080")))
-	r.Mount("/orders", http.StripPrefix("/orders", proxyHandler("http://localhost:8082")))
-	r.Mount("/courier", http.StripPrefix("/courier", proxyHandler("http://localhost:8083")))
-	r.Mount("/geo", http.StripPrefix("/geo", proxyHandler("http://localhost:8084")))
+	// Теперь мы указываем имена сервисов из docker-compose.yml
+	// Внутри сети Docker они работают как обычные доменные имена
+	r.Mount("/auth", http.StripPrefix("/auth", proxyHandler("http://auth-service:8081")))
+	r.Mount("/catalog", http.StripPrefix("/catalog", proxyHandler("http://catalog-service:8080")))
+	r.Mount("/orders", http.StripPrefix("/orders", proxyHandler("http://order-service:8082")))
+	r.Mount("/courier", http.StripPrefix("/courier", proxyHandler("http://courier-service:8083")))
+	r.Mount("/geo", http.StripPrefix("/geo", proxyHandler("http://geo-service:8084")))
 
-	log.Println("API Gateway запущен на порту :8000")
+	log.Println("API Gateway запущен на порту :8000 и готов маршрутизировать трафик внутри Docker")
 	if err := http.ListenAndServe(":8000", r); err != nil {
 		log.Fatal(err)
 	}

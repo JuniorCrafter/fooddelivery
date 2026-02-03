@@ -1,21 +1,28 @@
-# Stage 0: minimal, dependency-free Go services (stdlib only)
+# Этап 1: Сборка (используем легкий образ Go)
+FROM golang:1.25-alpine AS builder
 
-FROM golang:1.25-alpine AS build
-WORKDIR /src
+# Устанавливаем рабочую директорию
+WORKDIR /app
 
-COPY go.mod .
-# No external modules in Stage 0, but keep the command for future stages.
-RUN go mod download || true
+# Копируем файлы зависимостей
+COPY go.mod go.sum ./
+RUN go mod download
 
+# Копируем весь код проекта
 COPY . .
 
-ARG SERVICE=api
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w" -o /out/app ./cmd/${SERVICE}
+# Аргумент, который скажет, какой именно сервис собирать
+ARG SERVICE_PATH
 
-FROM alpine:3.20
-RUN adduser -D -g '' appuser && apk add --no-cache ca-certificates tzdata
-WORKDIR /
-COPY --from=build /out/app /app
-USER appuser
-EXPOSE 8080
-ENTRYPOINT ["/app"]
+# Собираем бинарный файл
+RUN go build -o service ${SERVICE_PATH}
+
+# Этап 2: Финальный образ (минимальный размер)
+FROM alpine:latest
+WORKDIR /root/
+
+# Копируем только собранный файл из первого этапа
+COPY --from=builder /app/service .
+
+# Запускаем сервис
+CMD ["./service"]

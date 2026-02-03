@@ -8,12 +8,15 @@ import (
 	"github.com/JuniorCrafter/fooddelivery/internal/geo/repo"
 	"github.com/JuniorCrafter/fooddelivery/internal/geo/service"
 	"github.com/JuniorCrafter/fooddelivery/internal/platform/cache"
+	"github.com/JuniorCrafter/fooddelivery/internal/platform/config"
 	"github.com/go-chi/chi/v5"
 )
 
 func main() {
-	// Подключаемся к Redis (адрес берем из.env, тут для примера localhost)
-	rdb, err := cache.NewRedisClient("localhost:6379", "")
+	cfg := config.Load()
+
+	// 2. Берем адрес Redis из настроек (в Docker это будет "redis:6379")
+	rdb, err := cache.NewRedisClient(cfg.RedisAddr, "")
 	if err != nil {
 		log.Fatalf("Ошибка Redis: %v", err)
 	}
